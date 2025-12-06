@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TEKEL Market Stok Takip Sistemi - Frontend
 
-## Getting Started
+Bu proje, Tekel bayileri için geliştirilmiş modern bir arayüze sahip stok ve kârlılık takip sistemidir.
 
-First, run the development server:
+## 🚀 Proje Durumu (Frontend Tamamlandı)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Projenin frontend geliştirmesi tamamlanmış olup, şu an **Mock Data** (temsili veriler) ile çalışmaktadır. Kullanıcı arayüzü, formlar, tablolar ve grafikler tamamen işlevseldir.
+
+### ✅ Tamamlanan Özellikler
+- **Genel Bakış (Dashboard):** Kritik stok, toplam kâr ve stok değeri özetleri.
+- **Ürün Yönetimi:** Ürün ekleme, listeleme ve stok durumu (Kritik/Normal) takibi.
+- **Stok Hareketleri:** Hızlı stok girişi (Alış) ve çıkışı (Satış) formları.
+- **Analiz:** Gelir/Gider ve Fiyat Trendi grafikleri (Recharts).
+- **Tasarım:** Premium "Deep Navy & Gold" teması, responsive (mobil uyumlu) yapı, havalı tekel logosu.
+
+### 🛠 Teknoloji Yığını
+- **Framework:** Next.js 16 (App Router)
+- **UI Kütüphanesi:** Shadcn/ui + Tailwind CSS
+- **State Yönetimi:** Zustand (Client side state)
+- **Veri Yönetimi:** TanStack Query (Hazırlandı, backend bekliyor)
+- **Formlar:** React Hook Form + Zod
+- **Grafikler:** Recharts
+
+---
+
+## 🔜 Backend Entegrasyonu (Yapılacaklar)
+
+Backend API servisleri (MongoDB + Prisma) hazırlandığında frontend tarafında yapılması gereken değişiklikler şunlardır:
+
+### 1. Servis Bağlantıları
+Backend API endpoint'leri için servis fonksiyonları yazılmalı.
+*Örnek (`src/services/productService.ts`):*
+```typescript
+export const getProducts = async () => {
+  const res = await fetch('/api/products');
+  return res.json();
+};
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. State Yönetimini Güncelleme
+Şu an `useProductStore` içinde tutulan mock veriler yerine **TanStack Query** kullanılmalı.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+*Eski (Zustand Mock):*
+```typescript
+const { products } = useProductStore();
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+*Yeni (TanStack Query):*
+```typescript
+const { data: products } = useQuery({ 
+  queryKey: ['products'], 
+  queryFn: getProducts 
+});
+```
 
-## Learn More
+### 3. Mutation (Veri Değişikliği) İşlemleri
+Ürün ekleme ve stok hareketi işlemleri için `useMutation` hook'ları eklenmeli.
 
-To learn more about Next.js, take a look at the following resources:
+```typescript
+const mutation = useMutation({
+  mutationFn: (newProduct) => axios.post('/api/products', newProduct),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['products'] });
+    toast.success('Ürün eklendi!');
+  },
+});
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 💻 Kurulum ve Çalıştırma
 
-## Deploy on Vercel
+Projeyi yerel ortamda çalıştırmak için:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Bağımlılıkları yükleyin:**
+   ```bash
+   npm install
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. **Geliştirme sunucusunu başlatın:**
+   ```bash
+   npm run dev
+   ```
+
+3. **Tarayıcıda açın:**
+   [http://localhost:3000](http://localhost:3000)

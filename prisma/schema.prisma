@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+enum StockTransactionType {
+  PURCHASE // alış
+  SALE // satış
+}
+
+enum ActionType {
+  PRODUCT_CREATE
+  PRODUCT_UPDATE
+  PRODUCT_DELETE
+
+  STOCK_PURCHASE
+  STOCK_SALE
+  STOCK_UPDATE
+
+  PRICE_UPDATE
+
+  USER_LOGIN
+  USER_LOGOUT
+}
+
+model User {
+  id       String @id @default(auto()) @map("_id") @db.ObjectId
+  username String @unique
+  password String
+  name     String?
+}
+
+// PRODUCT
+model Product {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  name     String // ürün adı 
+  ccValue  String // cc
+  category String // kategori 
+
+  minStock Int? @default(0)
+  maxStock Int?
+
+  // Mevcut stok miktarı
+  currentStock Int @default(0)
+
+  // Ağırlıklı ortalama maliyet WAC
+  averageCost Float @default(0.0)
+
+  // İlişkiler
+  transactions StockTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category]) // kategori filtreleme
+  @@index([name]) // isim arama
+  @@map("products")
+}
+
+// STOK HAREKETLERİ
+model StockTransaction {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  productId String  @db.ObjectId
+  product   Product @relation(fields: [productId], references: [id])
+
+  type StockTransactionType
+
+  quantity   Int
+  unitPrice  Float
+  totalPrice Float
+
+  // Kar hesaplaması için ortalama maliyet
+  snapshotCost Float?
+
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([productId, date])
+  @@index([type, date])
+  @@map("stock_transactions")
+}
+
+model ActionLog {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId      String?
+
+  action      ActionType
+
+  targetId    String?
+  targetType  String?
+
+  oldValue    Json?
+  newValue    Json?
+
+  message     String?
+
+  createdAt   DateTime    @default(now())
+
+  @@map("action_logs")
+  @@index([action, createdAt])
+}

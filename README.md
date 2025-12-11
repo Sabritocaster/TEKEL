@@ -1,86 +1,63 @@
-# TEKEL Market Stok Takip Sistemi - Frontend
+# https://api.vercel.com/v1/integrations/deploy/prj_rO86VGQzXbfKlEmbZRj4CZ2kmvZO/8Ol3lnb3fT
 
-Bu proje, Tekel bayileri için geliştirilmiş modern bir arayüze sahip stok ve kârlılık takip sistemidir.
+# Stock Tracking Application
 
-## 🚀 Proje Durumu (Frontend Tamamlandı)
+A full-stack stock tracking application built with Next.js, MongoDB, and Prisma.
 
-Projenin frontend geliştirmesi tamamlanmış olup, şu an **Mock Data** (temsili veriler) ile çalışmaktadır. Kullanıcı arayüzü, formlar, tablolar ve grafikler tamamen işlevseldir.
+## Tech Stack
 
-### ✅ Tamamlanan Özellikler
-- **Genel Bakış (Dashboard):** Kritik stok, toplam kâr ve stok değeri özetleri.
-- **Ürün Yönetimi:** Ürün ekleme, listeleme ve stok durumu (Kritik/Normal) takibi.
-- **Stok Hareketleri:** Hızlı stok girişi (Alış) ve çıkışı (Satış) formları.
-- **Analiz:** Gelir/Gider ve Fiyat Trendi grafikleri (Recharts).
-- **Tasarım:** Premium "Deep Navy & Gold" teması, responsive (mobil uyumlu) yapı, havalı tekel logosu.
+- **Frontend/Backend**: Next.js 14 (App Router)
+- **Database**: MongoDB
+- **ORM**: Prisma
+- **Styling**: Tailwind CSS
+- **Language**: JavaScript/JSX
 
-### 🛠 Teknoloji Yığını
-- **Framework:** Next.js 16 (App Router)
-- **UI Kütüphanesi:** Shadcn/ui + Tailwind CSS
-- **State Yönetimi:** Zustand (Client side state)
-- **Veri Yönetimi:** TanStack Query (Hazırlandı, backend bekliyor)
-- **Formlar:** React Hook Form + Zod
-- **Grafikler:** Recharts
+## Project Structure
 
----
+This project follows a **Feature-Based Modular Architecture**:
 
-## 🔜 Backend Entegrasyonu (Yapılacaklar)
+- `app/` - Next.js App Router routes and layouts
+- `features/` - Feature modules (products, orders, auth, dashboard)
+- `components/` - Global/shared UI components
+- `lib/` - Shared utilities and configurations
+- `prisma/` - Database schema and migrations
 
-Backend API servisleri (MongoDB + Prisma) hazırlandığında frontend tarafında yapılması gereken değişiklikler şunlardır:
+## Getting Started
 
-### 1. Servis Bağlantıları
-Backend API endpoint'leri için servis fonksiyonları yazılmalı.
-*Örnek (`src/services/productService.ts`):*
-```typescript
-export const getProducts = async () => {
-  const res = await fetch('/api/products');
-  return res.json();
-};
+1. Install dependencies:
+```bash
+npm install
 ```
 
-### 2. State Yönetimini Güncelleme
-Şu an `useProductStore` içinde tutulan mock veriler yerine **TanStack Query** kullanılmalı.
-
-*Eski (Zustand Mock):*
-```typescript
-const { products } = useProductStore();
+2. Set up environment variables:
+```bash
+cp .env.example .env.local
 ```
 
-*Yeni (TanStack Query):*
-```typescript
-const { data: products } = useQuery({ 
-  queryKey: ['products'], 
-  queryFn: getProducts 
-});
+3. Configure your MongoDB connection string in `.env.local`
+
+4. Set up Prisma:
+```bash
+npm run db:generate
+npm run db:push
 ```
 
-### 3. Mutation (Veri Değişikliği) İşlemleri
-Ürün ekleme ve stok hareketi işlemleri için `useMutation` hook'ları eklenmeli.
-
-```typescript
-const mutation = useMutation({
-  mutationFn: (newProduct) => axios.post('/api/products', newProduct),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    toast.success('Ürün eklendi!');
-  },
-});
+5. (Optional) Seed the database:
+```bash
+npm run db:seed
 ```
 
----
+6. Run the development server:
+```bash
+npm run dev
+```
 
-## 💻 Kurulum ve Çalıştırma
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-Projeyi yerel ortamda çalıştırmak için:
+## Architecture
 
-1. **Bağımlılıkları yükleyin:**
-   ```bash
-   npm install
-   ```
+This project uses an Integrated Feature-Based Modular Architecture where:
+- Each feature module contains its own components, server actions, and data access layer
+- Features are self-contained but can share global components and utilities
+- Server actions and data access are organized within each feature's `servers/` directory
 
-2. **Geliştirme sunucusunu başlatın:**
-   ```bash
-   npm run dev
-   ```
-
-3. **Tarayıcıda açın:**
-   [http://localhost:3000](http://localhost:3000)

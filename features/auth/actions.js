@@ -5,7 +5,12 @@ import { AuthError } from 'next-auth';
 
 export async function authenticate(prevState, formData) {
     try {
-        await signIn('credentials', formData);
+        const credentials = Object.fromEntries(formData);
+
+        await signIn('credentials', {
+            ...credentials,
+            redirectTo: '/',
+        });
     } catch (error) {
         if (error instanceof AuthError) {
             switch (error.type) {

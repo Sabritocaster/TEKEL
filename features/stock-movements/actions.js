@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma.js';
 import { stockTransactionSchema } from '@/lib/validations.js';
 import { revalidatePath } from 'next/cache';
+import { logAction } from '@/lib/auditLogger.js';
 
 /**
   belirli bir ürün için tüm stok hareketlerini baştan hesaplar.
@@ -26,9 +27,7 @@ async function recalculateProductState(tx, productId) {
     const { type, quantity, unitPrice, id } = movement;
 
     if (type === 'PURCHASE') {
-      // Eski toplam değer
       const totalCurrentValue = currentStock * averageCost;
-      // Yeni alımın toplam maliyeti
       const newPurchaseValue = quantity * unitPrice;
       const totalQuantity = currentStock + quantity;
 
@@ -40,10 +39,8 @@ async function recalculateProductState(tx, productId) {
         averageCost = 0;
       }
 
-      // 2 basamağa yuvarla
       averageCost = Math.round(averageCost * 100) / 100;
 
-      // Alış hareketinde snapshotCost olmamalı
       if (movement.snapshotCost !== null) {
         await tx.stockTransaction.update({
           where: { id },
@@ -51,14 +48,12 @@ async function recalculateProductState(tx, productId) {
         });
       }
     } else if (type === 'SALE') {
-      // Satıştan önce yeterli stok var mı
       if (currentStock < quantity) {
         throw new Error(
           `Geçmiş veriler tutarsız: Ürün ${productId} için stok eksiye düşüyor.`
         );
       }
 
-      // Satış anındaki maliyeti snapshot olarak kaydet
       const snapshotCost = averageCost;
 
       await tx.stockTransaction.update({
@@ -66,12 +61,10 @@ async function recalculateProductState(tx, productId) {
         data: { snapshotCost },
       });
 
-      // Satış sonrası stok düşer
       currentStock -= quantity;
     }
   }
 
-  // Ürünü güncelle
   await tx.product.update({
     where: { id: productId },
     data: {
@@ -81,8 +74,8 @@ async function recalculateProductState(tx, productId) {
   });
 }
 
- // Yeni stok hareketi (alış satış) ekleme
- 
+// YENİ STOK HAREKETİ EKLEME                         
+
 export async function createStockTransactionAction(rawData) {
   try {
     const validated = stockTransactionSchema.safeParse(rawData);
@@ -94,7 +87,6 @@ export async function createStockTransactionAction(rawData) {
     const { productId, type, quantity, unitPrice } = validated.data;
 
     const createdTx = await prisma.$transaction(async (tx) => {
-      // Ürünü kontrol et
       const product = await tx.product.findUnique({
         where: { id: productId },
       });
@@ -103,7 +95,6 @@ export async function createStockTransactionAction(rawData) {
         throw new Error('Ürün bulunamadı.');
       }
 
-      // Hareketi oluştur
       const newTx = await tx.stockTransaction.create({
         data: {
           productId,
@@ -111,22 +102,34 @@ export async function createStockTransactionAction(rawData) {
           quantity,
           unitPrice,
           totalPrice: quantity * unitPrice,
+          date: new Date(),
         },
       });
 
-      // Ürünün stok  maliyetini baştan hesapla
       await recalculateProductState(tx, productId);
+
+      // LOG
+      await logAction({
+        action: type === 'PURCHASE' ? 'STOCK_PURCHASE' : 'STOCK_SALE',
+        targetId: newTx.id,
+        targetType: 'StockTransaction',
+        oldValue: null,
+        newValue: newTx,
+        message:
+          type === 'PURCHASE'
+            ? `Stok girişi: Ürün=${product.name}, Adet=${quantity}, Fiyat=${unitPrice}`
+            : `Stok çıkışı: Ürün=${product.name}, Adet=${quantity}, Fiyat=${unitPrice}`,
+      });
 
       return newTx;
     });
 
-    // SSR sayfalarını invalidate et
     revalidatePath('/stock-movements');
     revalidatePath('/products');
     revalidatePath('/dashboard');
+    revalidatePath('/');
 
-    const sanitized = JSON.parse(JSON.stringify(createdTx));
-    return { success: true, data: sanitized };
+    return { success: true, data: JSON.parse(JSON.stringify(createdTx)) };
   } catch (error) {
     console.error('createStockTransactionAction Error:', error);
     return {
@@ -136,9 +139,9 @@ export async function createStockTransactionAction(rawData) {
   }
 }
 
-  // Stok hareketlerini listeleme
- 
-export async function getStockMovementsAction(limit = 50) {
+//  STOK LİSTELEME                                   
+
+export async function getStockMovementsAction(limit = 50, rangeKey = '6m') {
   try {
     const movements = await prisma.stockTransaction.findMany({
       include: {
@@ -161,13 +164,12 @@ export async function getStockMovementsAction(limit = 50) {
   }
 }
 
-
- //  Hareket silme ve ürün stok,maliyetini düzeltme
- 
+// STOK HAREKETİ SİLME
 export async function deleteStockTransactionAction(id) {
   try {
+    if (!id) return { success: false, error: 'İşlem kimliği (id) eksik.' };
+
     await prisma.$transaction(async (tx) => {
-      //  Silinecek hareketi al
       const transaction = await tx.stockTransaction.findUnique({
         where: { id },
       });
@@ -176,55 +178,62 @@ export async function deleteStockTransactionAction(id) {
         throw new Error('İşlem bulunamadı.');
       }
 
-      const productId = transaction.productId;
+      const product = await tx.product.findUnique({
+        where: { id: transaction.productId },
+      });
 
-      //  Hareketi sil
+      if (!product) {
+        throw new Error('Ürün bulunamadı.');
+      }
+
       await tx.stockTransaction.delete({ where: { id } });
 
-      //  ürün için stok ve maliyeti baştan hesapla
-      await recalculateProductState(tx, productId);
+      await recalculateProductState(tx, product.id);
+
+      await logAction({
+        action: 'STOCK_UPDATE',
+        targetId: transaction.id,
+        targetType: 'StockTransaction',
+        oldValue: transaction,
+        newValue: null,
+        message: `Stok hareketi silindi: Ürün=${product.name}, Adet=${transaction.quantity}`,
+      });
     });
 
     revalidatePath('/stock-movements');
     revalidatePath('/products');
     revalidatePath('/dashboard');
+    revalidatePath('/');
 
     return { success: true };
   } catch (error) {
     console.error('deleteStockTransactionAction Error:', error);
     return {
       success: false,
-      error: error.message || 'Silme hatası.',
+      error: error.message || 'Silme işlemi sırasında hata oluştu.',
     };
   }
 }
 
-//  Hareket güncelleme (ürün değiştirme ihtimali dahil)
+//  STOK HAREKETİ GÜNCELLEME   
 
 export async function updateStockTransactionAction(rawData) {
   try {
     const validated = stockTransactionSchema.safeParse(rawData);
     if (!validated.success) {
-      return { success: false, error: 'Geçersiz veri.' };
+      return { success: false, error: "Geçersiz veri." };
     }
 
-    const { id } = rawData; 
-    if (!id) {
-      return { success: false, error: 'İşlem kimliği (id) eksik.' };
-    }
+    const { id } = rawData;
+    if (!id) return { success: false, error: "İşlem kimliği (id) eksik." };
 
     await prisma.$transaction(async (tx) => {
-      // Eski işlemi getir
-      const oldTx = await tx.stockTransaction.findUnique({
-        where: { id },
-      });
-      if (!oldTx) throw new Error('İşlem bulunamadı.');
+      const oldTx = await tx.stockTransaction.findUnique({ where: { id } });
+      if (!oldTx) throw new Error("İşlem bulunamadı.");
 
-      const oldProductId = oldTx.productId;
       const { productId, type, quantity, unitPrice } = validated.data;
 
-      // İşlemi güncelle
-      await tx.stockTransaction.update({
+      const updatedTx = await tx.stockTransaction.update({
         where: { id },
         data: {
           productId,
@@ -235,25 +244,49 @@ export async function updateStockTransactionAction(rawData) {
         },
       });
 
-      // ürün değiştiyse iki ürün için de hesapla
-      if (productId !== oldProductId) {
-        await recalculateProductState(tx, oldProductId);
-        await recalculateProductState(tx, productId);
+      const product = await tx.product.findUnique({
+        where: { id: productId },
+      });
+
+      let msg = `Stok hareketi güncellendi: Ürün=${product.name}, `;
+
+      if (oldTx.quantity !== updatedTx.quantity) {
+        msg += `Adet: ${oldTx.quantity} → ${updatedTx.quantity}`;
+      } else if (oldTx.unitPrice !== updatedTx.unitPrice) {
+        msg += `Fiyat: ${oldTx.unitPrice} → ${updatedTx.unitPrice}`;
       } else {
-        await recalculateProductState(tx, productId);
+        msg += "Değişiklik tespit edilmedi";
       }
+
+      await logAction({
+        action: "STOCK_UPDATE",
+        targetId: updatedTx.id,
+        targetType: "StockTransaction",
+        oldValue: oldTx,
+        newValue: updatedTx,
+        message: msg,
+      });
+
+      if (oldTx.productId !== productId) {
+    await recalculateProductState(tx, oldTx.productId);  
+    await recalculateProductState(tx, productId); 
+    } else {
+    await recalculateProductState(tx, productId);
+    }
+
     });
 
-    revalidatePath('/stock-movements');
-    revalidatePath('/products');
-    revalidatePath('/dashboard');
+    revalidatePath("/stock-movements");
+    revalidatePath("/products");
+    revalidatePath("/dashboard");
+    revalidatePath('/');
 
     return { success: true };
   } catch (error) {
-    console.error('updateStockTransactionAction Error:', error);
+    console.error("updateStockTransactionAction Error:", error);
     return {
       success: false,
-      error: error.message || 'Güncelleme hatası.',
+      error: error.message || "Güncelleme hatası.",
     };
   }
 }

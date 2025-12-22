@@ -1,43 +1,43 @@
 import NextAuth from 'next-auth';
-import { authConfig } from './auth.config';
 import Credentials from 'next-auth/providers/credentials';
-import { z } from 'zod';
+import { authConfig } from './auth.config';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
 
 async function getUser(username) {
-    try {
-        const user = await prisma.user.findUnique({
-            where: { username },
-        });
-        return user;
-    } catch (error) {
-        console.error('Failed to fetch user:', error);
-        throw new Error('Failed to fetch user.');
-    }
+  try {
+    return await prisma.user.findUnique({ where: { username } });
+  } catch (error) {
+    console.error('Failed to fetch user:', error);
+    return null;
+  }
 }
 
 export const { auth, signIn, signOut } = NextAuth({
-    ...authConfig,
-    providers: [
-        Credentials({
-            async authorize(credentials) {
-                const parsedCredentials = z
-                    .object({ username: z.string(), password: z.string().min(6) })
-                    .safeParse(credentials);
+  ...authConfig,
+  providers: [
+    Credentials({
+      async authorize(credentials) {
+        const parsed = z
+          .object({
+            username: z.string(),
+            password: z.string().min(6),
+          })
+          .safeParse(credentials);
 
-                if (parsedCredentials.success) {
-                    const { username, password } = parsedCredentials.data;
-                    const user = await getUser(username);
-                    if (!user) return null;
+        if (!parsed.success) return null;
 
-                    const passwordsMatch = await bcrypt.compare(password, user.password);
-                    if (passwordsMatch) return user;
-                }
+        const { username, password } = parsed.data;
 
-                console.log('Invalid credentials');
-                return null;
-            },
-        }),
-    ],
+        const user = await getUser(username);
+        if (!user) return null;
+
+        const ok = await bcrypt.compare(password, user.password);
+        if (!ok) return null;
+
+        return user;
+      },
+    }),
+  ],
 });

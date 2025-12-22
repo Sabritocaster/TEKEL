@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
 export default function MovementsPage() {
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
                     <h2 className="text-3xl font-bold tracking-tight">Stok Hareketleri</h2>
                     <p className="text-muted-foreground">
                         Stok giriş ve çıkış işlemlerini buradan yapabilir, geçmiş hareketleri inceleyebilirsiniz.
@@ -19,7 +19,7 @@ export default function MovementsPage() {
 
             <div className="grid gap-6 lg:grid-cols-3">
                 <div className="lg:col-span-1">
-                    <div className="sticky top-6">
+                    <div className="lg:sticky lg:top-6">
                         <MovementForm />
                     </div>
                 </div>

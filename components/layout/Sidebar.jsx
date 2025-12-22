@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils.js';
 import {
+    Home,
     LayoutDashboard,
     Package,
     ArrowRightLeft,
@@ -17,10 +18,12 @@ import { signOutAction } from '@/features/auth/actions';
 import Image from 'next/image';
 
 const MENU_ITEMS = [
+    { href: '/', label: 'Ana Sayfa', icon: Home },
     { href: '/dashboard', label: 'Genel Bakış', icon: LayoutDashboard },
     { href: '/products', label: 'Ürün Yönetimi', icon: Package },
     { href: '/stock-movements', label: 'Stok Hareketleri', icon: ArrowRightLeft },
     { href: '/reports', label: 'Analiz & Rapor', icon: TrendingUp },
+    { href: '/audit-logs', label: 'İşlem Kayıtları', icon: Settings },
 ];
 
 export function AppSidebar({ className }) {

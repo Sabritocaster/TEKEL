@@ -1,9 +1,30 @@
-import NextAuth from 'next-auth';
-import { authConfig } from './auth.config';
+import { NextResponse } from 'next/server';
 
-export default NextAuth(authConfig).auth;
+export function middleware(req) {
+  const pathname = req.nextUrl.pathname;
+
+  const hasSession =
+    req.cookies.get('authjs.session-token') ||
+    req.cookies.get('__Secure-authjs.session-token');
+
+  if (pathname === '/login' && hasSession) {
+    return NextResponse.redirect(new URL('/dashboard', req.url));
+  }
+
+  if (!hasSession && pathname !== '/login') {
+    return NextResponse.redirect(new URL('/login', req.url));
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
-    // https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
-    matcher: ['/((?!api|_next/static|_next/image|.*\\.png$).*)'],
+  matcher: [
+    '/dashboard/:path*',
+    '/products/:path*',
+    '/stock-movements/:path*',
+    '/reports/:path*',
+    '/audit-logs/:path*',
+    '/login',
+  ],
 };

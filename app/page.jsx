@@ -32,7 +32,7 @@ export default async function HomePage() {
                   className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <LayoutDashboard className="h-4 w-4" />
-                  Dashboard'a Git
+                  Dashboard&apos;a Git
                 </Link>
 
                 <div className="grid grid-cols-2 gap-2 pt-2">
